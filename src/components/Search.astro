@@ -7,6 +7,7 @@ import { url } from '../lib/site';
   <label class="search-label" for="search-input">搜索文章全文</label>
   <div class="search-field"><Icon name="search"/><input id="search-input" type="search" placeholder="试试「无障碍」或「散步」" autocomplete="off" aria-describedby="search-status"/></div>
   <p id="search-status" role="status" aria-live="polite">输入关键词，发现相关的文字。</p>
+  <button type="button" class="search-retry" data-retry-search hidden>重试搜索</button>
   <ul id="search-results" aria-label="搜索结果"></ul>
   <div class="search-footer"><span>Pagefind 全文搜索 · 本地索引</span><span><kbd>Esc</kbd> 关闭</span></div>
 </dialog>
@@ -15,19 +16,36 @@ import { url } from '../lib/site';
   const input = document.querySelector<HTMLInputElement>('#search-input')!;
   const results = document.querySelector<HTMLUListElement>('#search-results')!;
   const status = document.querySelector<HTMLElement>('#search-status')!;
+  const retrySearch = dialog.querySelector<HTMLButtonElement>('[data-retry-search]')!;
   type SearchData = { url: string; meta: {title?: string}; excerpt: string };
   type Pagefind = { options: (options: {baseUrl: string}) => Promise<void>; search: (query: string) => Promise<{results: {data: () => Promise<SearchData>}[]}> };
   let modulePromise: Promise<Pagefind> | undefined;
+  let moduleAttempt = 0;
   let trigger: HTMLElement | null = null;
   let sequence = 0;
   let timer: ReturnType<typeof setTimeout>;
+  let busyTimer: ReturnType<typeof setTimeout>;
+  let searchTimeout: ReturnType<typeof setTimeout>;
+  function clearBusy() {
+    clearTimeout(busyTimer); clearTimeout(searchTimeout);
+    status.removeAttribute('data-busy');
+    results.setAttribute('aria-busy', 'false');
+  }
+  function cancelQuery() {
+    ++sequence; clearTimeout(timer); clearBusy();
+  }
+  function failure(text = '搜索暂不可用，请检查网络后重试。') {
+    clearBusy(); status.textContent = text; retrySearch.hidden = false;
+  }
   function engine() {
     if (!modulePromise) {
-      const path = dialog.dataset.searchModule!;
-      modulePromise = import(/* @vite-ignore */ path).then(async (pf: Pagefind) => {
+      const path = dialog.dataset.searchModule! + (moduleAttempt ? `?retry=${moduleAttempt}` : '');
+      const task = import(/* @vite-ignore */ path).then(async (pf: Pagefind) => {
         await pf.options({baseUrl: dialog.dataset.base!});
         return pf;
-      }).catch((error: unknown) => { modulePromise = undefined; throw error; });
+      });
+      modulePromise = task;
+      task.catch(() => { if (modulePromise === task) { modulePromise = undefined; moduleAttempt++; } });
     }
     return modulePromise;
   }
@@ -37,7 +55,14 @@ import { url } from '../lib/site';
     dialog.showModal();
     document.body.classList.add('dialog-open');
     input.focus();
-    engine().catch(() => { status.textContent = '搜索索引暂不可用。请使用构建后的预览，或稍后重试。'; });
+    cancelQuery();
+    retrySearch.hidden = true;
+    if (input.value.trim()) void search();
+    else {
+      status.textContent = '输入关键词，发现相关的文字。';
+      const version = sequence;
+      engine().catch(() => { if (dialog.open && sequence === version) failure('搜索索引暂不可用。请检查网络，或使用构建后的预览。'); });
+    }
   }
   document.querySelectorAll<HTMLElement>('[data-open-search]').forEach(button => button.addEventListener('click', openSearch));
   dialog.querySelector('[data-close-search]')!.addEventListener('click', () => dialog.close());
@@ -50,7 +75,13 @@ import { url } from '../lib/site';
     if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
     else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
   });
-  dialog.addEventListener('close', () => { document.body.classList.remove('dialog-open'); trigger?.focus(); });
+  dialog.addEventListener('close', () => {
+    // A queued close event may arrive after an immediate reopen.
+    if (dialog.open) return;
+    cancelQuery();
+    document.body.classList.remove('dialog-open');
+    trigger?.focus();
+  });
   dialog.addEventListener('click', (event) => { if (event.target === dialog) { const r = dialog.getBoundingClientRect(); if (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) dialog.close(); } });
   document.addEventListener('keydown', event => {
     const editing = event.target instanceof HTMLElement && (event.target.matches('input, textarea, select') || event.target.isContentEditable);
@@ -60,13 +91,23 @@ import { url } from '../lib/site';
     const version = ++sequence;
     const query = input.value.trim();
     results.replaceChildren();
+    clearBusy(); retrySearch.hidden = true;
     if (!query) { status.textContent = '输入关键词，发现相关的文字。'; return; }
+    if (!navigator.onLine) { failure('当前处于离线状态，请联网后重试搜索。'); return; }
     status.textContent = '正在搜索…';
+    results.setAttribute('aria-busy', 'true');
+    busyTimer = setTimeout(() => { if (dialog.open && sequence === version) status.setAttribute('data-busy', ''); }, 180);
+    searchTimeout = setTimeout(() => {
+      if (dialog.open && sequence === version) { ++sequence; failure('搜索等待超时，请检查网络后重试。'); }
+    }, 12000);
     try {
       const pf = await engine();
+      if (version !== sequence || !dialog.open) return;
       const found = await pf.search(query);
+      if (version !== sequence || !dialog.open) return;
       const data = await Promise.all(found.results.slice(0, 12).map(result => result.data()));
-      if (version !== sequence) return;
+      if (version !== sequence || !dialog.open) return;
+      clearBusy();
       status.textContent = found.results.length ? `找到 ${found.results.length} 篇相关文章` : '没有找到相关文章，换一个关键词试试。';
       for (const item of data) {
         const li = document.createElement('li');
@@ -82,9 +123,18 @@ import { url } from '../lib/site';
         }
         link.append(title, excerpt); li.append(link); results.append(li);
       }
-    } catch { if (version === sequence) status.textContent = '搜索索引暂不可用。请使用构建后的预览，或稍后重试。'; }
+    } catch { if (version === sequence && dialog.open) failure(); }
   }
-  input.addEventListener('compositionstart', () => { clearTimeout(timer); ++sequence; });
-  input.addEventListener('input', event => { clearTimeout(timer); ++sequence; if (!event.isComposing) timer = setTimeout(search, 180); });
+  retrySearch.addEventListener('click', () => {
+    cancelQuery(); modulePromise = undefined; moduleAttempt++; input.focus();
+    if (input.value.trim()) void search();
+    else { const version = sequence; retrySearch.hidden = true; engine().catch(() => { if (dialog.open && sequence === version) failure(); }); }
+  });
+  input.addEventListener('compositionstart', cancelQuery);
+  input.addEventListener('input', event => {
+    cancelQuery(); retrySearch.hidden = true;
+    if (!input.value.trim()) { results.replaceChildren(); status.textContent = '输入关键词，发现相关的文字。'; return; }
+    if (!event.isComposing) timer = setTimeout(search, 180);
+  });
   input.addEventListener('compositionend', () => { clearTimeout(timer); timer = setTimeout(search, 0); });
 </script>

@@ -1,0 +1,102 @@
+<!-- Native MPA transitions: this must run before the first render, including BFCache restores. -->
+<script is:inline>
+  (() => {
+    const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+    const supported = typeof PageRevealEvent !== 'undefined' && CSS.supports('view-transition-name', 'article-container');
+    if (!supported) return;
+    const key = 'glonee-motion';
+    let clicked = null;
+    let active = null;
+    const path = (value) => new URL(value, location.href).pathname;
+    function read() {
+      try {
+        const value = JSON.parse(sessionStorage.getItem(key) || '{}');
+        return value && typeof value === 'object' ? value : {};
+      } catch { return {}; }
+    }
+    function clearNames() {
+      document.querySelectorAll('[data-motion-active]').forEach(element => {
+        element.style.removeProperty('view-transition-name');
+        element.removeAttribute('data-motion-active');
+      });
+      delete document.documentElement.dataset.articleMotion;
+    }
+    function candidate(post, remembered) {
+      const cards = Array.from(document.querySelectorAll('[data-motion-card]')).filter(element => element.dataset.postPath === post && element.getClientRects().length);
+      return cards.find(element => element.dataset.motionEntry === remembered)
+        || cards.find(element => element.classList.contains('post-card')) || cards[0];
+    }
+    function name(element, transition) {
+      clearNames();
+      element.style.viewTransitionName = 'article-container';
+      element.dataset.motionActive = '';
+      const title = element.querySelector('[data-motion-title]');
+      if (title) { title.style.viewTransitionName = 'article-title'; title.dataset.motionActive = ''; }
+      active = transition;
+      // Outgoing ready rejects after its snapshot; this is expected, not an application error.
+      transition.ready.catch(() => {});
+      transition.finished.then(() => { if (active === transition) { clearNames(); active = null; } }, clearNames);
+    }
+    document.addEventListener('click', event => {
+      clicked = null;
+      if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || !(event.target instanceof Element)) return;
+      const link = event.target.closest('a[href]');
+      if (!link || link.hasAttribute('download') || (link.target && link.target !== '_self')) return;
+      const target = new URL(link.href);
+      if (target.origin !== location.origin) return;
+      const card = link.closest('[data-motion-card]');
+      if (card && card.dataset.postPath === target.pathname) clicked = { path: target.pathname, card };
+    }, { capture: true });
+    window.addEventListener('pageswap', event => {
+      const transition = event.viewTransition;
+      if (!transition) return;
+      if (reduced.matches || !event.activation || document.querySelector('dialog[open]') || document.documentElement.hasAttribute('data-navigation-from-search')) { transition.skipTransition(); return; }
+      const next = path(event.activation.entry.url);
+      const state = read();
+      const remembered = state.entries || {};
+      const detail = document.querySelector('[data-motion-detail]');
+      const backwards = event.activation.navigationType === 'traverse' && event.activation.entry.index < event.activation.from.index;
+      // On reverse traversal the current detail contracts into the previous page's entry.
+      const selected = clicked?.path === next ? clicked.card
+        : backwards && detail ? detail
+        : candidate(next, remembered[location.pathname + next]) || detail;
+      clicked = null;
+      if (!selected) { transition.skipTransition(); return; }
+      const rect = selected.getBoundingClientRect();
+      if (rect.bottom <= 0 || rect.top >= innerHeight) { transition.skipTransition(); return; }
+      const post = selected.dataset.postPath;
+      if (selected.hasAttribute('data-motion-card')) remembered[location.pathname + post] = selected.dataset.motionEntry;
+      const from = getComputedStyle(selected);
+      // A bounded, tab-local handoff pairs related-post navigation as well as back/forward.
+      const entries = Object.fromEntries(Object.entries(remembered).slice(-40));
+      const transfer = { from: location.pathname, to: next, post, radius: from.borderRadius, surface: from.backgroundColor, time: Date.now() };
+      try { sessionStorage.setItem(key, JSON.stringify({ entries, transfer })); }
+      catch { transition.skipTransition(); return; }
+      name(selected, transition);
+    });
+    window.addEventListener('pagereveal', event => {
+      const transition = event.viewTransition;
+      if (!transition) { clearNames(); return; }
+      if (reduced.matches) { transition.skipTransition(); clearNames(); return; }
+      const state = read();
+      const transfer = state.transfer;
+      const from = window.navigation?.activation?.from?.url;
+      if (!transfer || !from || transfer.from !== path(from) || transfer.to !== location.pathname || Date.now() - transfer.time > 15000) { transition.skipTransition(); clearNames(); return; }
+      const detail = document.querySelector('[data-motion-detail]');
+      const selected = detail?.dataset.postPath === transfer.post ? detail
+        : candidate(transfer.post, state.entries?.[location.pathname + transfer.post]);
+      if (!selected) { transition.skipTransition(); clearNames(); return; }
+      const rect = selected.getBoundingClientRect();
+      if (rect.bottom <= 0 || rect.top >= innerHeight) { transition.skipTransition(); clearNames(); return; }
+      const to = getComputedStyle(selected);
+      const root = document.documentElement;
+      root.style.setProperty('--motion-from-radius', transfer.radius);
+      root.style.setProperty('--motion-to-radius', to.borderRadius);
+      root.style.setProperty('--motion-from-surface', transfer.surface);
+      root.style.setProperty('--motion-to-surface', to.backgroundColor);
+      name(selected, transition);
+      root.dataset.articleMotion = selected.hasAttribute('data-motion-detail') ? 'expand' : 'contract';
+    });
+    reduced.addEventListener('change', () => { if (reduced.matches) { active?.skipTransition(); clearNames(); } });
+  })();
+</script>

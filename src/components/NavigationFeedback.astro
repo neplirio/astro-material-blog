@@ -1,0 +1,125 @@
+---
+import { url } from '../lib/site';
+---
+<aside id="navigation-feedback" class="navigation-feedback" data-base={url()} aria-label="页面加载" hidden>
+  <div class="navigation-loading-bar" aria-hidden="true"><span></span></div>
+  <div class="navigation-notice">
+    <p id="navigation-message" role="status" aria-live="polite"></p>
+    <button type="button" class="navigation-action" data-cancel-navigation>取消</button>
+    <a class="navigation-action" data-retry-navigation href={url()} hidden>重试</a>
+    <button type="button" class="navigation-action" data-dismiss-navigation hidden>关闭</button>
+  </div>
+</aside>
+<script>
+  const feedback = document.querySelector<HTMLElement>('#navigation-feedback')!;
+  const message = document.querySelector<HTMLElement>('#navigation-message')!;
+  const cancel = feedback.querySelector<HTMLButtonElement>('[data-cancel-navigation]')!;
+  const retry = feedback.querySelector<HTMLAnchorElement>('[data-retry-navigation]')!;
+  const dismiss = feedback.querySelector<HTMLButtonElement>('[data-dismiss-navigation]')!;
+  const siteBase = feedback.dataset.base!;
+  type Pending = { target: string; show: ReturnType<typeof setTimeout>; timeout: ReturnType<typeof setTimeout>; cleanup: () => void };
+  let pending: Pending | undefined;
+  let trigger: HTMLElement | null = null;
+  const nativeNavigation = window.navigation;
+  function isPage(target: URL) {
+    return target.origin === location.origin && target.pathname.startsWith(siteBase) && target.pathname.endsWith('/');
+  }
+  function clear() {
+    if (pending) { clearTimeout(pending.show); clearTimeout(pending.timeout); pending.cleanup(); pending = undefined; }
+    feedback.hidden = true;
+    feedback.removeAttribute('data-state');
+    delete document.documentElement.dataset.navigationFromSearch;
+    message.textContent = '';
+  }
+  function recover(text: string, target: string) {
+    const restoreFocus = document.activeElement === cancel;
+    clear();
+    retry.href = target;
+    message.textContent = text;
+    feedback.dataset.state = 'error';
+    feedback.hidden = false;
+    cancel.hidden = true; retry.hidden = false; dismiss.hidden = false;
+    if (restoreFocus) retry.focus();
+  }
+  function stop(text: string) {
+    if (!pending) return;
+    const target = pending.target;
+    const restoreFocus = document.activeElement === cancel;
+    // Detach the abort listener first; our explicit recovery message takes precedence.
+    clear();
+    window.stop();
+    recover(text, target);
+    if (restoreFocus) retry.focus();
+  }
+  function begin(target: string, signal?: AbortSignal) {
+    clear();
+    trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const fromSearch = document.querySelector<HTMLDialogElement>('#search-dialog')?.open;
+    const state: Pending = {
+      target,
+      show: setTimeout(() => {
+        if (pending !== state) return;
+        // A slow search-result navigation needs its cancel action outside the modal to be usable.
+        if (fromSearch) {
+          document.documentElement.dataset.navigationFromSearch = '';
+          document.querySelector<HTMLDialogElement>('#search-dialog')?.close();
+        }
+        feedback.dataset.state = 'loading';
+        feedback.hidden = false;
+        cancel.hidden = false; retry.hidden = true; dismiss.hidden = true;
+        message.textContent = '正在打开页面，请稍候…';
+      }, 180),
+      timeout: setTimeout(() => { if (pending === state) stop('等待已超时，已停止打开。请检查网络后重试。'); }, 15000),
+      cleanup: () => {},
+    };
+    pending = state;
+    if (signal) {
+      const aborted = () => { if (pending === state) recover('打开已中断。你可以重试或继续阅读。', target); };
+      signal.addEventListener('abort', aborted, { once:true });
+      state.cleanup = () => signal.removeEventListener('abort', aborted);
+    }
+  }
+  if (nativeNavigation) {
+    // Observe native navigation; never intercept, prefetch, or download the document twice.
+    nativeNavigation.addEventListener('navigate', event => {
+      clear();
+      const target = new URL(event.destination.url);
+      if (event.defaultPrevented || event.destination.sameDocument || event.downloadRequest !== null || !isPage(target)) return;
+      if (!navigator.onLine && event.cancelable) {
+        event.preventDefault();
+        recover('当前处于离线状态，请联网后重试。', target.href);
+        return;
+      }
+      begin(target.href, event.signal);
+    });
+    nativeNavigation.addEventListener('navigateerror', () => {
+      if (pending) recover('暂时无法打开页面，请检查网络后重试。', pending.target);
+    });
+    // Full-document success is cleared at pageswap/pagehide, not a speculative click timer.
+  } else {
+    document.addEventListener('click', event => {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || !(event.target instanceof Element)) return;
+      const link = event.target.closest<HTMLAnchorElement>('a[href]');
+      if (!link || link.hasAttribute('download') || (link.target && link.target !== '_self')) return;
+      const target = new URL(link.href);
+      if (!isPage(target) || (target.pathname === location.pathname && target.search === location.search)) return;
+      if (!navigator.onLine) { event.preventDefault(); recover('当前处于离线状态，请联网后重试。', target.href); return; }
+      begin(target.href);
+    });
+  }
+  cancel.addEventListener('click', () => stop('已取消打开。你可以重试或继续阅读。'));
+  dismiss.addEventListener('click', () => {
+    clear();
+    if (trigger?.isConnected && trigger.getClientRects().length) trigger.focus();
+    else document.querySelector<HTMLElement>('[data-open-search]')?.focus();
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && pending && !document.querySelector('dialog[open]')) { event.preventDefault(); stop('已取消打开。你可以重试或继续阅读。'); }
+  });
+  window.addEventListener('offline', () => { if (pending) stop('网络已断开，已停止打开。请联网后重试。'); });
+  // Clear before capture and on BFCache restoration; no loading layer becomes part of the morph.
+  window.addEventListener('pageswap', clear);
+  window.addEventListener('pagehide', clear);
+  window.addEventListener('pageshow', clear);
+  window.addEventListener('pagereveal', clear);
+</script>

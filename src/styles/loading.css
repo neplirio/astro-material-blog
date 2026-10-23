@@ -1,0 +1,22 @@
+.navigation-feedback { position: fixed; inset: 0; pointer-events: none; z-index: 40; }
+.navigation-loading-bar { position: absolute; inset: 0 0 auto; height: 3px; overflow: hidden; background: var(--tonal); }
+.navigation-loading-bar span { display: block; width: 36%; height: 100%; background: var(--primary); border-radius: 3px; animation: navigation-wait 1400ms cubic-bezier(.4,0,.2,1) infinite; }
+@keyframes navigation-wait { from { translate: -110% 0; } to { translate: 390% 0; } }
+.navigation-notice { position: absolute; bottom: 24px; right: 24px; display: flex; align-items: center; gap: 12px; max-width: min(540px, calc(100vw - 32px)); padding: 13px 16px; background: var(--paper); color: var(--text); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow); pointer-events: auto; }
+.navigation-notice p { font-size: 12px; line-height: 1.8; color: var(--text); }
+.navigation-action { color: var(--primary); font-size: 12px; font-weight: 600; padding: 7px 10px; border-radius: 12px; white-space: nowrap; }
+.navigation-action:is(:hover,:focus-visible) { background: var(--tonal); }
+.navigation-action:active { background: var(--surface-high); }
+.navigation-feedback[data-state='error'] .navigation-loading-bar { display: none; }
+#search-status[data-busy]::before { content: ''; display: inline-block; width: 13px; height: 13px; margin-right: 9px; vertical-align: -2px; border: 2px solid var(--line); border-top-color: var(--primary); border-radius: 50%; animation: search-wait 800ms linear infinite; }
+@keyframes search-wait { to { rotate: 360deg; } }
+.search-retry { color: var(--primary); padding: 6px 12px; border: 1px solid var(--line); border-radius: 12px; margin-bottom: 14px; font-size: 12px; }
+@media (max-width: 540px) {
+  .navigation-notice { bottom: max(16px, env(safe-area-inset-bottom)); right: 16px; gap: 6px; flex-wrap: wrap; }
+  .navigation-notice p { flex: 1 1 170px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .navigation-loading-bar { display: none; }
+  .navigation-loading-bar span, #search-status[data-busy]::before { animation: none !important; }
+  #search-status[data-busy]::before { display: none; }
+}

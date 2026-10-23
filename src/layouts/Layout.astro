@@ -2,6 +2,10 @@
 import '@fontsource-variable/noto-sans-sc';
 import '@fontsource-variable/noto-serif-sc';
 import '../styles/global.css';
+import '../styles/motion.css';
+import '../styles/loading.css';
+import NavigationFeedback from '../components/NavigationFeedback.astro';
+import Motion from '../components/Motion.astro';
 import Icon from '../components/Icon.astro';
 import Search from '../components/Search.astro';
 import { site, url } from '../lib/site';
@@ -24,6 +28,7 @@ const links = [{label:'首页', path:''}, {label:'文章归档',path:'archive/'}
   <meta property="og:type" content={article ? 'article' : 'website'}/><meta property="og:locale" content="zh_CN"/><meta property="og:site_name" content={site.title}/><meta property="og:title" content={pageTitle}/><meta property="og:description" content={description}/><meta property="og:url" content={canonical}/><meta property="og:image" content={new URL(url('social.svg'), Astro.site)}/>
   <meta name="twitter:card" content="summary_large_image"/>
   <link rel="icon" type="image/svg+xml" href={url('favicon.svg')}/><link rel="alternate" type="application/rss+xml" title="Glonee 的数字花园" href={url('rss.xml')}/><link rel="sitemap" href={url('sitemap-index.xml')}/>
+  <Motion/>
   <slot name="head"/>
 </head>
 <body>
@@ -38,6 +43,7 @@ const links = [{label:'首页', path:''}, {label:'文章归档',path:'archive/'}
   <main id="main" tabindex="-1"><slot/></main>
   <footer class="site-footer"><div class="footer-main"><a class="footer-brand" href={url()}>Glonee<span>保持好奇，慢慢生长。</span></a><div class="footer-links"><a href={url('archive/')}>所有文章</a><a href={url('about/')}>关于这个花园</a><a href={url('rss.xml')}><Icon name="rss" size={16}/>RSS 订阅</a></div></div><div class="footer-bottom"><span>© {new Date().getUTCFullYear()} Glonee · 用心记录，持续迭代</span><span>Built with Astro <span aria-hidden="true"><Icon name="flower" size={11}/></span> 在这里，文字有自己的节奏</span></div></footer>
   <Search/>
+  <NavigationFeedback/>
   <script>
     const select = document.querySelector<HTMLSelectElement>('#theme-select')!;
     select.value = document.documentElement.dataset.themePreference ?? 'system';

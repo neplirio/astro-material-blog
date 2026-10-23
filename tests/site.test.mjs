@@ -27,8 +27,8 @@ test('built pages have Chinese metadata, canonical URLs and accessible landmarks
 test('all internal links, scripts, styles, metadata assets and anchors resolve under base', async () => {
   for (const [file,$] of pages) {
     const current = new URL(base + file.slice(root.length+1).replace(/index\.html$/,''),origin);
-    for (const el of $('[href],[src],[data-search-module]')) {
-      const attr = $(el).attr('href') ?? $(el).attr('src') ?? $(el).attr('data-search-module');
+    for (const el of $('[href],[src],[data-search-module],[data-post-path]')) {
+      const attr = $(el).attr('href') ?? $(el).attr('src') ?? $(el).attr('data-search-module') ?? $(el).attr('data-post-path');
       if (!attr || /^(mailto:|tel:|data:|javascript:)/.test(attr)) continue;
       const url = new URL(attr,current); if (url.origin !== origin) continue;
       const path = target(url);
