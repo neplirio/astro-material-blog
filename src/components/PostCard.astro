@@ -1,0 +1,15 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import { postUrl, dateLabel } from '../lib/site';
+import Icon from './Icon.astro';
+interface Props { post: CollectionEntry<'posts'>; index?: number; }
+const { post, index = 0 } = Astro.props;
+const { data } = post;
+const icon = data.topic === '开发手记' ? 'code' : data.topic === '设计思考' ? 'palette' : 'leaf';
+---
+<article class:list={['post-card', `tone-${index % 3}`]} data-topic={data.topic}>
+  <div class="card-top"><span class="topic-icon"><Icon name={icon} size={22}/></span><span class="eyebrow">{data.topic}</span>{data.demo && <span class="demo-small">示例</span>}</div>
+  <h3><a href={postUrl(post.id)}>{data.title}</a></h3>
+  <p>{data.description}</p>
+  <div class="card-bottom"><span>{dateLabel(data.date)} <span class="meta-dot">·</span> {data.minutes} 分钟</span><span class="card-arrow"><Icon name="arrow" size={20}/></span></div>
+</article>

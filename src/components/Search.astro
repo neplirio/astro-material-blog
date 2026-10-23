@@ -1,0 +1,90 @@
+---
+import Icon from './Icon.astro';
+import { url } from '../lib/site';
+---
+<dialog id="search-dialog" aria-labelledby="search-title" data-search-module={url('pagefind/pagefind.js')} data-base={url()}>
+  <div class="dialog-top"><div><span class="eyebrow">FIND A LITTLE INSPIRATION</span><h2 id="search-title">在花园里找一找</h2></div><button class="icon-button" data-close-search aria-label="关闭搜索"><Icon name="close"/></button></div>
+  <label class="search-label" for="search-input">搜索文章全文</label>
+  <div class="search-field"><Icon name="search"/><input id="search-input" type="search" placeholder="试试「无障碍」或「散步」" autocomplete="off" aria-describedby="search-status"/></div>
+  <p id="search-status" role="status" aria-live="polite">输入关键词，发现相关的文字。</p>
+  <ul id="search-results" aria-label="搜索结果"></ul>
+  <div class="search-footer"><span>Pagefind 全文搜索 · 本地索引</span><span><kbd>Esc</kbd> 关闭</span></div>
+</dialog>
+<script>
+  const dialog = document.querySelector<HTMLDialogElement>('#search-dialog')!;
+  const input = document.querySelector<HTMLInputElement>('#search-input')!;
+  const results = document.querySelector<HTMLUListElement>('#search-results')!;
+  const status = document.querySelector<HTMLElement>('#search-status')!;
+  type SearchData = { url: string; meta: {title?: string}; excerpt: string };
+  type Pagefind = { options: (options: {baseUrl: string}) => Promise<void>; search: (query: string) => Promise<{results: {data: () => Promise<SearchData>}[]}> };
+  let modulePromise: Promise<Pagefind> | undefined;
+  let trigger: HTMLElement | null = null;
+  let sequence = 0;
+  let timer: ReturnType<typeof setTimeout>;
+  function engine() {
+    if (!modulePromise) {
+      const path = dialog.dataset.searchModule!;
+      modulePromise = import(/* @vite-ignore */ path).then(async (pf: Pagefind) => {
+        await pf.options({baseUrl: dialog.dataset.base!});
+        return pf;
+      }).catch((error: unknown) => { modulePromise = undefined; throw error; });
+    }
+    return modulePromise;
+  }
+  function openSearch() {
+    if (dialog.open) return;
+    trigger = document.activeElement as HTMLElement;
+    dialog.showModal();
+    document.body.classList.add('dialog-open');
+    input.focus();
+    engine().catch(() => { status.textContent = '搜索索引暂不可用。请使用构建后的预览，或稍后重试。'; });
+  }
+  document.querySelectorAll<HTMLElement>('[data-open-search]').forEach(button => button.addEventListener('click', openSearch));
+  dialog.querySelector('[data-close-search]')!.addEventListener('click', () => dialog.close());
+  dialog.addEventListener('keydown', event => {
+    if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); dialog.close(); return; }
+    if (event.key !== 'Tab') return;
+    const focusable = Array.from(dialog.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), a[href]')).filter(element => element.getClientRects().length > 0);
+    const first = focusable[0];
+    const last = focusable.at(-1);
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+  });
+  dialog.addEventListener('close', () => { document.body.classList.remove('dialog-open'); trigger?.focus(); });
+  dialog.addEventListener('click', (event) => { if (event.target === dialog) { const r = dialog.getBoundingClientRect(); if (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) dialog.close(); } });
+  document.addEventListener('keydown', event => {
+    const editing = event.target instanceof HTMLElement && (event.target.matches('input, textarea, select') || event.target.isContentEditable);
+    if (((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') || (event.key === '/' && !editing)) { event.preventDefault(); openSearch(); }
+  });
+  async function search() {
+    const version = ++sequence;
+    const query = input.value.trim();
+    results.replaceChildren();
+    if (!query) { status.textContent = '输入关键词，发现相关的文字。'; return; }
+    status.textContent = '正在搜索…';
+    try {
+      const pf = await engine();
+      const found = await pf.search(query);
+      const data = await Promise.all(found.results.slice(0, 12).map(result => result.data()));
+      if (version !== sequence) return;
+      status.textContent = found.results.length ? `找到 ${found.results.length} 篇相关文章` : '没有找到相关文章，换一个关键词试试。';
+      for (const item of data) {
+        const li = document.createElement('li');
+        const link = document.createElement('a');
+        link.href = item.url;
+        const title = document.createElement('strong'); title.textContent = item.meta.title ?? '文章';
+        const excerpt = document.createElement('p');
+        // Only preserve Pagefind's highlight marks; all other content becomes text.
+        const parsed = new DOMParser().parseFromString(item.excerpt, 'text/html');
+        for (const child of parsed.body.childNodes) {
+          if (child instanceof HTMLElement && child.tagName === 'MARK') { const mark = document.createElement('mark'); mark.textContent = child.textContent; excerpt.append(mark); }
+          else excerpt.append(document.createTextNode(child.textContent ?? ''));
+        }
+        link.append(title, excerpt); li.append(link); results.append(li);
+      }
+    } catch { if (version === sequence) status.textContent = '搜索索引暂不可用。请使用构建后的预览，或稍后重试。'; }
+  }
+  input.addEventListener('compositionstart', () => { clearTimeout(timer); ++sequence; });
+  input.addEventListener('input', event => { clearTimeout(timer); ++sequence; if (!event.isComposing) timer = setTimeout(search, 180); });
+  input.addEventListener('compositionend', () => { clearTimeout(timer); timer = setTimeout(search, 0); });
+</script>

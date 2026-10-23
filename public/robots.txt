@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /astro-material-blog/
+Sitemap: https://neplirio.github.io/astro-material-blog/sitemap-index.xml

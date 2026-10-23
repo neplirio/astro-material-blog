@@ -1,0 +1,34 @@
+---
+import { getCollection } from 'astro:content';
+import Layout from '../layouts/Layout.astro';
+import Icon from '../components/Icon.astro';
+import HeroArt from '../components/HeroArt.astro';
+import PostCard from '../components/PostCard.astro';
+import { url, postUrl } from '../lib/site';
+const posts = (await getCollection('posts')).sort((a,b) => b.data.date.valueOf() - a.data.date.valueOf());
+const featured = posts.find(post => post.data.featured) ?? posts[0];
+const demoCount = posts.filter(post => post.data.demo).length;
+const topics = ['全部文章', '开发手记', '设计思考', '生活切片'];
+---
+<Layout>
+  <div class="page-shell">
+    <section class="hero" aria-labelledby="hero-title"><div class="hero-copy"><span class="intro-pill"><span class="status-dot"></span> 你好，欢迎来到我的一小片互联网</span><h1 id="hero-title">保持好奇，<br/>让想法<span class="title-flower">慢慢生长<svg viewBox="0 0 310 18" aria-hidden="true"><path d="M3 12C70 1 215 1 305 10" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round"/></svg></span>。</h1><p>我是 Glonee，在代码与生活之间探索。<br/>这里收藏开发手记、设计思考，和那些值得记下的小事。</p><div class="hero-buttons"><a class="button filled" href="#latest">逛逛我的文章 <Icon name="arrow" size={19}/></a><a class="button outlined" href={url('about/')}>认识一下 <span aria-hidden="true">↗</span></a></div><div class="hero-footnote"><span aria-hidden="true"><Icon name="flower" size={18}/></span> 不急着抵达，先享受探索。</div></div><div class="hero-visual"><HeroArt/><span class="art-caption">THOUGHTS, CODE & A LITTLE EVERYDAY MAGIC</span></div></section>
+    <section class="featured" aria-labelledby="featured-title"><div class="featured-symbol" aria-hidden="true"><Icon name="flower" size={80}/></div><div class="featured-copy"><span class="eyebrow"><Icon name="sparkle" size={14}/> 编辑精选{featured.data.demo ? ' · 示例文章' : ''}</span><h2 id="featured-title"><a href={postUrl(featured.id)}>{featured.data.title}</a></h2><p>{featured.data.description}</p><span class="featured-meta">{featured.data.topic} <span>·</span> {featured.data.minutes} 分钟阅读</span></div><a class="round-link" href={postUrl(featured.id)} aria-label={`阅读精选：${featured.data.title}`}><Icon name="arrow" size={27}/></a></section>
+    <section id="latest" class="latest" aria-labelledby="latest-title"><div class="section-heading"><div><span class="eyebrow">FRESH FROM THE GARDEN</span><h2 id="latest-title">最近写下的<span class="heading-count">{posts.length}</span></h2></div><a class="text-link" href={url('archive/')}>查看归档 <Icon name="arrow" size={18}/></a></div>
+    <div class="filter-row" aria-label="按主题筛选">{topics.map((topic, index) => <button class="filter-chip" data-filter={index === 0 ? 'all' : topic} aria-pressed={index === 0}><span class="chip-check" aria-hidden="true">✓</span>{topic}<span class="chip-count">{index === 0 ? posts.length : posts.filter(post => post.data.topic === topic).length}</span></button>)}</div>
+    <p class="sr-only" id="filter-status" role="status" aria-live="polite">显示全部 {posts.length} 篇文章</p><div class="posts-grid">{posts.map((post, index) => <PostCard post={post} index={index}/>)}</div>
+    </section>
+    <section class="garden-note"><span class="note-icon"><Icon name="leaf" size={30}/></span><div><h2>文字是思考留下的脚印。</h2><p>这个花园还在生长。偶尔写技术，偶尔聊生活，欢迎你随时回来坐坐。</p></div><a class="button tonal" href={url('rss.xml')}><Icon name="rss" size={18}/> 用 RSS 慢慢读</a></section>
+    <p class="demo-disclosure">关于内容：当前 {demoCount} 篇文章为原创演示内容，用于展示博客功能，不代表 Glonee 的真实经历或观点。</p>
+  </div>
+</Layout>
+<script>
+  const chips = document.querySelectorAll<HTMLButtonElement>('[data-filter]');
+  const cards = document.querySelectorAll<HTMLElement>('.post-card');
+  chips.forEach(chip => chip.addEventListener('click', () => {
+    chips.forEach(button => button.setAttribute('aria-pressed', String(button === chip)));
+    let count = 0;
+    cards.forEach(card => { card.hidden = chip.dataset.filter !== 'all' && chip.dataset.filter !== card.dataset.topic; if (!card.hidden) count++; });
+    document.querySelector('#filter-status')!.textContent = `显示${chip.textContent?.replace(/[✓\d]/g, '').trim()}，共 ${count} 篇文章`;
+  }));
+</script>

@@ -1,0 +1,12 @@
+---
+import { getCollection } from 'astro:content';
+import Layout from '../layouts/Layout.astro';
+import Icon from '../components/Icon.astro';
+import { dateLabel, postUrl } from '../lib/site';
+const posts = (await getCollection('posts')).sort((a,b) => b.data.date.valueOf() - a.data.date.valueOf());
+const years = [...new Set(posts.map(post => post.data.date.getUTCFullYear()))];
+---
+<Layout title="文章归档" description="沿着时间的脉络，翻阅 Glonee 数字花园里的开发手记、设计思考与生活切片。">
+<div class="page-shell narrow"><header class="page-intro"><span class="eyebrow">THE GARDEN JOURNAL</span><h1>写过的，都在这里。</h1><p>把零散的想法，收进时间的抽屉。<br/>目前共有 {posts.length} 篇文章，演示稿均已单独标注。</p></header>
+{years.map(year => <section class="archive-year" aria-labelledby={`year-${year}`}><h2 id={`year-${year}`}>{year}<span>年</span></h2><div class="archive-list">{posts.filter(post => post.data.date.getUTCFullYear() === year).map(post => <article class="archive-item"><time datetime={post.data.date.toISOString()}>{dateLabel(post.data.date)}</time><div><span class="eyebrow">{post.data.topic}{post.data.demo ? ' · 示例文章' : ''}</span><h3><a href={postUrl(post.id)}>{post.data.title}</a></h3><p>{post.data.description}</p></div><Icon name="arrow"/></article>)}</div></section>)}
+</div></Layout>

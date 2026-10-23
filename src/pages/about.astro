@@ -1,0 +1,11 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Icon from '../components/Icon.astro';
+import { url } from '../lib/site';
+---
+<Layout title="关于我" description="认识 Glonee 的数字花园：关于开发、设计和认真观察日常的一处个人写作空间。">
+<div class="page-shell narrow"><header class="page-intro"><span class="eyebrow">A LITTLE ABOUT THIS SPACE</span><h1>你好，我是 Glonee<span class="wave" aria-hidden="true"><Icon name="flower" size={33}/></span></h1><p>一个用文字整理思考，用代码探索可能的人。</p></header>
+<section class="about-card"><div class="about-avatar" aria-hidden="true">g<span><Icon name="flower" size={30}/></span></div><div><span class="eyebrow">欢迎，路过的朋友</span><h2>在代码与日常之间，<br/>留一块自由生长的地方。</h2><p>这里是 Glonee 的个人博客。一部分写给正在解决问题的自己，一部分留给有相同好奇心的你。希望一篇清晰的笔记，能成为下一次探索的起点。</p><p>目前站内文章为原创演示稿，用来展示写作、分类与搜索功能。它们不构成个人履历，也不代表真实生活经历。</p></div></section>
+<div class="about-topics"><section><Icon name="code" size={28}/><h2>把问题弄明白</h2><p>记录有上下文的开发过程，从一个小问题出发，留下可复用的方法。</p></section><section><Icon name="palette" size={28}/><h2>让体验更体贴</h2><p>关注视觉、交互与无障碍。好看的界面，也应该让每个人都能轻松使用。</p></section><section><Icon name="leaf" size={28}/><h2>给日常一点留白</h2><p>观察生活里的细节，接受缓慢的积累。不是每一个想法都需要立刻有答案。</p></section></div>
+<section class="about-writing prose"><h2>关于这座数字花园</h2><p>网站使用 Astro 构建为静态页面，文章以 Markdown 保存。全文搜索由 Pagefind 在浏览器本地完成，搜索词不会提交给第三方搜索服务。</p><p>你可以在右上角切换浅色、深色或系统主题，也可以按 <kbd>Ctrl / ⌘ K</kbd> 搜索。偏好只保存在当前浏览器中。</p><p>如果你习惯慢阅读，欢迎通过 RSS 订阅。这里没有更新承诺，只有持续记录的愿望。</p><a class="button filled" href={url('rss.xml')}><Icon name="rss" size={18}/> 订阅这个花园</a></section>
+</div></Layout>

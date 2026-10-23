@@ -1,0 +1,61 @@
+---
+import '@fontsource-variable/noto-sans-sc';
+import '@fontsource-variable/noto-serif-sc';
+import '../styles/global.css';
+import Icon from '../components/Icon.astro';
+import Search from '../components/Search.astro';
+import { site, url } from '../lib/site';
+interface Props { title?: string; description?: string; article?: boolean; noindex?: boolean; }
+const { title, description = site.description, article = false, noindex = false } = Astro.props;
+const pageTitle = title ? `${title} · Glonee` : site.title;
+const canonical = new URL(noindex ? url('404.html') : Astro.url.pathname, Astro.site);
+const links = [{label:'首页', path:''}, {label:'文章归档',path:'archive/'}, {label:'关于我',path:'about/'}];
+---
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <script is:inline>
+    (() => { let preference = 'system'; try { const saved = localStorage.getItem('glonee-theme'); if (['light','dark','system'].includes(saved)) preference = saved; } catch {} const dark = preference === 'dark' || (preference === 'system' && matchMedia('(prefers-color-scheme: dark)').matches); document.documentElement.dataset.theme = dark ? 'dark' : 'light'; document.documentElement.dataset.themePreference = preference; })();
+  </script>
+  <title>{pageTitle}</title><meta name="description" content={description}/><link rel="canonical" href={canonical}/>
+  {noindex && <meta name="robots" content="noindex"/>}
+  <meta name="theme-color" content="#f9f6fc" media="(prefers-color-scheme: light)"/><meta name="theme-color" content="#18151e" media="(prefers-color-scheme: dark)"/>
+  <meta property="og:type" content={article ? 'article' : 'website'}/><meta property="og:locale" content="zh_CN"/><meta property="og:site_name" content={site.title}/><meta property="og:title" content={pageTitle}/><meta property="og:description" content={description}/><meta property="og:url" content={canonical}/><meta property="og:image" content={new URL(url('social.svg'), Astro.site)}/>
+  <meta name="twitter:card" content="summary_large_image"/>
+  <link rel="icon" type="image/svg+xml" href={url('favicon.svg')}/><link rel="alternate" type="application/rss+xml" title="Glonee 的数字花园" href={url('rss.xml')}/><link rel="sitemap" href={url('sitemap-index.xml')}/>
+  <slot name="head"/>
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到主要内容</a>
+  <header class="site-header"><div class="header-inner">
+    <a class="brand" href={url()} aria-label="Glonee 首页"><span class="brand-mark">g<span><Icon name="flower" size={14}/></span></span><span>Glonee<span class="brand-caption">一个持续生长的数字花园</span></span></a>
+    <nav class="desktop-nav" aria-label="主导航">{links.map(link => <a href={url(link.path)} aria-current={Astro.url.pathname === url(link.path) ? 'page' : undefined}>{link.label}</a>)}</nav>
+    <div class="header-actions"><button class="search-trigger" data-open-search aria-label="搜索文章"><Icon name="search" size={20}/><span>搜索</span><kbd>⌘ K</kbd></button>
+    <label class="theme-control"><Icon name="sun" size={20}/><span class="sr-only">主题</span><select id="theme-select" aria-label="主题"><option value="system">跟随系统</option><option value="light">浅色模式</option><option value="dark">深色模式</option></select></label>
+    <button id="menu-toggle" class="icon-button mobile-menu" aria-label="打开导航" aria-controls="mobile-nav" aria-expanded="false"><Icon name="menu"/></button></div>
+  </div><nav id="mobile-nav" aria-label="移动导航" hidden>{links.map(link => <a href={url(link.path)} aria-current={Astro.url.pathname === url(link.path) ? 'page' : undefined}>{link.label}<Icon name="arrow" size={18}/></a>)}</nav></header>
+  <main id="main" tabindex="-1"><slot/></main>
+  <footer class="site-footer"><div class="footer-main"><a class="footer-brand" href={url()}>Glonee<span>保持好奇，慢慢生长。</span></a><div class="footer-links"><a href={url('archive/')}>所有文章</a><a href={url('about/')}>关于这个花园</a><a href={url('rss.xml')}><Icon name="rss" size={16}/>RSS 订阅</a></div></div><div class="footer-bottom"><span>© {new Date().getUTCFullYear()} Glonee · 用心记录，持续迭代</span><span>Built with Astro <span aria-hidden="true"><Icon name="flower" size={11}/></span> 在这里，文字有自己的节奏</span></div></footer>
+  <Search/>
+  <script>
+    const select = document.querySelector<HTMLSelectElement>('#theme-select')!;
+    select.value = document.documentElement.dataset.themePreference ?? 'system';
+    const media = matchMedia('(prefers-color-scheme: dark)');
+    function applyTheme(value: string) {
+      document.documentElement.dataset.themePreference = value;
+      document.documentElement.dataset.theme = value === 'dark' || (value === 'system' && media.matches) ? 'dark' : 'light';
+      select.value = value;
+    }
+    select.addEventListener('change', () => { applyTheme(select.value); try { localStorage.setItem('glonee-theme', select.value); } catch {} });
+    media.addEventListener('change', () => { if (select.value === 'system') applyTheme('system'); });
+    window.addEventListener('storage', event => { if (event.key === 'glonee-theme') applyTheme(['light','dark','system'].includes(event.newValue ?? '') ? event.newValue! : 'system'); });
+    const toggle = document.querySelector<HTMLButtonElement>('#menu-toggle')!;
+    const nav = document.querySelector<HTMLElement>('#mobile-nav')!;
+    function closeNav() { nav.hidden = true; toggle.setAttribute('aria-expanded','false'); toggle.setAttribute('aria-label','打开导航'); }
+    toggle.addEventListener('click', () => { const open = nav.hidden; nav.hidden = !open; toggle.setAttribute('aria-expanded', String(open)); toggle.setAttribute('aria-label', open ? '关闭导航' : '打开导航'); });
+    document.addEventListener('keydown', event => { if (event.key === 'Escape' && !nav.hidden) { closeNav(); toggle.focus(); } });
+    matchMedia('(min-width: 800px)').addEventListener('change', event => { if (event.matches) closeNav(); });
+  </script>
+</body>
+</html>

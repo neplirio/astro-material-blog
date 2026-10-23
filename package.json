@@ -1,0 +1,33 @@
+{
+  "name": "glonee-material-blog",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.23.4"
+  },
+  "scripts": {
+    "dev": "astro dev",
+    "check": "astro check",
+    "build": "astro build && node scripts/index-search.mjs",
+    "preview": "astro preview --host 127.0.0.1 --port 4321 --ignore-lock",
+    "test": "node --test tests/site.test.mjs",
+    "test:e2e": "node scripts/playwright.mjs",
+    "verify": "npm run check && npm run build && npm test && npm run test:e2e",
+    "test:install": "node scripts/playwright.mjs install chromium"
+  },
+  "dependencies": {
+    "@astrojs/rss": "4.0.19",
+    "@astrojs/sitemap": "3.7.4",
+    "@fontsource-variable/noto-sans-sc": "5.3.1",
+    "@fontsource-variable/noto-serif-sc": "5.3.1",
+    "astro": "7.4.2"
+  },
+  "devDependencies": {
+    "@astrojs/check": "0.9.12",
+    "@playwright/test": "1.64.1",
+    "cheerio": "1.2.0",
+    "pagefind": "1.5.2",
+    "typescript": "6.0.3"
+  }
+}

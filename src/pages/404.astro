@@ -1,0 +1,6 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Icon from '../components/Icon.astro';
+import { url } from '../lib/site';
+---
+<Layout title="页面不见了" noindex><div class="not-found page-shell"><span class="error-art" aria-hidden="true">4<Icon name="flower" size={80}/>4</span><span class="eyebrow">A SMALL DETOUR</span><h1>这条小路，还没有长出文字。</h1><p>页面可能已搬家，也可能是地址写错了。<br/>回到花园，或者搜索你想找的内容。</p><div class="hero-buttons"><a class="button filled" href={url()}>回到首页 <Icon name="arrow" size={18}/></a><button class="button outlined" data-open-search><Icon name="search" size={18}/>搜索文章</button></div></div></Layout>
